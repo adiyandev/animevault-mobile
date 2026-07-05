@@ -53,6 +53,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.graphics.graphicsLayer
 import coil.compose.AsyncImage
 import com.example.data.model.Anime
 import com.example.ui.DetailState
@@ -99,8 +100,16 @@ fun uploadToCloudinary(
     onSuccess: (String) -> Unit,
     onFailure: (String) -> Unit
 ) {
-    val cloudName = "dmljhhe1l"
-    val uploadPreset = "animevault"
+    val cloudName = try {
+        BuildConfig.VITE_CLOUDINARY_CLOUD_NAME.takeIf { !it.isNullOrBlank() && it != "MY_CLOUDINARY_CLOUD_NAME" } ?: "dmljhhe1l"
+    } catch (e: Throwable) {
+        "dmljhhe1l"
+    }
+    val uploadPreset = try {
+        BuildConfig.VITE_CLOUDINARY_UPLOAD_PRESET.takeIf { !it.isNullOrBlank() && it != "MY_CLOUDINARY_UPLOAD_PRESET" } ?: "animevault"
+    } catch (e: Throwable) {
+        "animevault"
+    }
     val url = "https://api.cloudinary.com/v1_1/$cloudName/image/upload"
 
     val client = OkHttpClient()
@@ -181,7 +190,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             AsyncImage(
-                model = "https://github.com/animevaultofficial/animevaultofficial.github.io/blob/main/logo.png?raw=true",
+                model = R.drawable.ic_logo,
                 contentDescription = "AnimeVault Logo",
                 modifier = Modifier
                     .size(160.dp)
@@ -278,7 +287,7 @@ fun AnimeApp() {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         AsyncImage(
-                            model = "https://github.com/animevaultofficial/animevaultofficial.github.io/blob/main/logo.png?raw=true",
+                            model = R.drawable.ic_logo,
                             contentDescription = "AnimeVault Logo",
                             modifier = Modifier
                                 .size(44.dp)
@@ -448,7 +457,7 @@ fun AnimeApp() {
                             id = id,
                             viewModel = viewModel,
                             onBack = { navController.popBackStack() },
-                            onPlay = { ep -> navController.navigate("player/$id/$ep") },
+                            onPlay = { season, ep -> navController.navigate("player/$id/$season/$ep") },
                             onGenreClick = {
                                 navController.navigate(Screen.Search.route) {
                                     popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -459,11 +468,12 @@ fun AnimeApp() {
                         )
                     }
                 }
-                composable("player/{id}/{ep}") { backStackEntry ->
+                composable("player/{id}/{season}/{ep}") { backStackEntry ->
                     val id = backStackEntry.arguments?.getString("id")?.toIntOrNull()
+                    val season = backStackEntry.arguments?.getString("season")?.toIntOrNull() ?: 1
                     val ep = backStackEntry.arguments?.getString("ep")?.toIntOrNull() ?: 1
                     if (id != null) {
-                        PlayerScreen(animeId = id, episode = ep, viewModel = viewModel, onBack = { navController.popBackStack() })
+                        PlayerScreen(animeId = id, season = season, episode = ep, viewModel = viewModel, onBack = { navController.popBackStack() })
                     }
                 }
             }
@@ -1154,9 +1164,7 @@ fun AnimeDetailModal(
     }
 }
 
-// ==========================================
-// 1. HOME SCREEN (HomePage.jsx parity)
-// ==========================================
+// Home Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit) {
@@ -1738,69 +1746,14 @@ fun HomeScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit) {
 
 @Composable
 fun HeroCarousel(trending: List<Anime>, onAnimeClick: (Int) -> Unit) {
-    val slideshowAnimeList = remember {
-        listOf(
-            Anime(
-                malId = 1535,
-                title = "Death Note",
-                titleEnglish = "Death Note",
-                images = null,
-                score = 8.62,
-                synopsis = "A high school student discovers a supernatural notebook that grants him the ability to kill anyone by writing their name in it.",
-                episodes = 37,
-                status = "Finished Airing",
-                year = 2006
-            ),
-            Anime(
-                malId = 41389,
-                title = "Tonikawa: Over the Moon For You",
-                titleEnglish = "Tonikawa: Over the Moon For You",
-                images = null,
-                score = 7.91,
-                synopsis = "Tsukasa and Nasa Yuzaki fall in love at first sight and decide to get married, beginning their sweet daily lives together.",
-                episodes = 12,
-                status = "Finished Airing",
-                year = 2020
-            ),
-            Anime(
-                malId = 21,
-                title = "One Piece",
-                titleEnglish = "One Piece",
-                images = null,
-                score = 8.72,
-                synopsis = "Monkey D. Luffy and his pirate crew search for the ultimate treasure, the One Piece, to become the next Pirate King.",
-                episodes = 1100,
-                status = "Currently Airing",
-                year = 1999
-            ),
-            Anime(
-                malId = 19,
-                title = "Monster",
-                titleEnglish = "Monster",
-                images = null,
-                score = 8.88,
-                synopsis = "A brilliant brain surgeon's life is pathologically changed when he decides to save a young boy's life instead of a prominent politician.",
-                episodes = 74,
-                status = "Finished Airing",
-                year = 2004
-            ),
-            Anime(
-                malId = 52299,
-                title = "Solo Leveling",
-                titleEnglish = "Solo Leveling",
-                images = null,
-                score = 8.36,
-                synopsis = "In a world where hunters must battle deadly monsters to protect mankind, Sung Jinwoo, a weak hunter, receives a unique leveling system.",
-                episodes = 12,
-                status = "Finished Airing",
-                year = 2024
-            )
-        )
+    val slideshowAnimeList = remember(trending) {
+        trending.filter { it.posterUrl != null || it.images != null }.take(5)
     }
 
+    if (slideshowAnimeList.isEmpty()) return
+
     var activeIndex by rememberSaveable(slideshowAnimeList) { mutableStateOf(0) }
-    
-    // Auto sliding effect
+
     LaunchedEffect(slideshowAnimeList.size) {
         while (true) {
             delay(5000)
@@ -1809,15 +1762,12 @@ fun HeroCarousel(trending: List<Anime>, onAnimeClick: (Int) -> Unit) {
     }
 
     val currentAnime = slideshowAnimeList[activeIndex]
-
-    val imageModel = when (currentAnime.malId) {
-        1535 -> "https://m.media-amazon.com/images/M/MV5BOTdjOGZlNWUtYTQ0NC00YjIwLTgzMGQtYjA1Y2YxZWJjMDA4XkEyXkFqcGc@._V1_QL75_UX291_.jpg"
-        41389 -> "https://m.media-amazon.com/images/S/pv-target-images/8bed8b49da4505916ef814544e0f452d3a0002e0abbe568a9b37a79205c55bea._BR-6_AC_SX720_FMjpg_.jpg"
-        21 -> "https://wallpaperaccess.com/full/8750973.jpg"
-        19 -> "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEHwRLuPMW4mpzEQqP-8vYauka8N4_F5PckqRXQHrjAw&s=10"
-        52299 -> "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSNYbn-V557RrlGjrqQ50wyzUqyNRh4TL_pHuffuiU1X8hr4HWY4TLZiWjP&s=10"
-        else -> R.drawable.ic_launcher_foreground
-    }
+    val imageModel = currentAnime.posterUrl
+        ?: currentAnime.images?.jpg?.largeImageUrl
+        ?: currentAnime.images?.jpg?.imageUrl
+        ?: currentAnime.images?.webp?.largeImageUrl
+        ?: currentAnime.images?.webp?.imageUrl
+        ?: R.drawable.ic_launcher_foreground
 
     Box(
         modifier = Modifier
@@ -2048,9 +1998,175 @@ fun AnimeGridCard(anime: Anime, onClick: () -> Unit) {
     }
 }
 
-// ==========================================
-// 2. SEARCH SCREEN (SearchPage.jsx parity)
-// ==========================================
+@Composable
+fun AnimeFlashcard(anime: Anime, onClick: () -> Unit) {
+    var rotated by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(
+        targetValue = if (rotated) 180f else 0f,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "cardFlip"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .graphicsLayer {
+                rotationY = rotation
+                cameraDistance = 12 * density
+            }
+            .clickable { rotated = !rotated },
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        if (rotation <= 90f) {
+            // Front side of the card
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = animePosterModel(anime),
+                    contentDescription = anime.displayTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                // Gradient overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                            )
+                        )
+                )
+                
+                // Score badge
+                if (anime.score != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(anime.score.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = anime.displayTitle,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Tap to Flip 🔄",
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else {
+            // Back side of the card (rotated 180 degrees)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationY = 180f // Render upright on the back
+                    }
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = anime.displayTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { rotated = !rotated },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Flip Back", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = anime.synopsis ?: "No description available.",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (anime.year != null) {
+                            Text(
+                                text = "Year: ${anime.year}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            )
+                        }
+                        if (anime.episodes != null) {
+                            Text(
+                                text = "Episodes: ${anime.episodes}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            )
+                        }
+                        Text(
+                            text = anime.status ?: "",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = onClick,
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Watch Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Search Screen
 @Composable
 fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNavigateToShows: () -> Unit) {
     val results by viewModel.searchResults.collectAsState()
@@ -2110,6 +2226,8 @@ fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNaviga
         baseList.distinctBy { it.malId }
     }
 
+    val isSearching = query.isNotBlank() || filterGenre.isNotBlank()
+
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -2129,9 +2247,9 @@ fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNaviga
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
-                        IconButton(onClick = { 
+                        IconButton(onClick = {
                             viewModel.searchQuery.value = ""
-                            viewModel.searchAnime("") 
+                            viewModel.searchAnime("")
                         }) {
                             Icon(Icons.Default.Close, contentDescription = "Clear search")
                         }
@@ -2161,20 +2279,8 @@ fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNaviga
                     tint = if (showFilters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
                 )
             }
-
-            Button(
-                onClick = onNavigateToShows,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                modifier = Modifier.height(48.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Browse Shows", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            }
         }
 
-        // Category Tabs filter Row
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2206,7 +2312,6 @@ fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNaviga
             }
         }
 
-        // Expandable Filters Accordion
         AnimatedVisibility(visible = showFilters) {
             Column(
                 modifier = Modifier
@@ -2250,52 +2355,63 @@ fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNaviga
             }
         }
 
-        // Results view
-        if (state is HomeState.Loading && listToShow.isEmpty()) {
+        if (state is HomeState.Loading && listToShow.isEmpty() && isSearching) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else {
-            val isSearching = query.isNotBlank() || filterGenre.isNotBlank()
             if (isSearching) {
                 if (filteredList.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            "No results in $selectedCategory category for search query", 
+                            "No results in $selectedCategory category for search query",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 } else {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(118.dp),
+                        columns = GridCells.Adaptive(110.dp),
                         contentPadding = PaddingValues(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
                         items(filteredList) { anime ->
-                            AnimeCard(anime = anime, onClick = { onAnimeClick(anime.malId) })
+                            AnimeGridCard(anime = anime, onClick = { onAnimeClick(anime.malId) })
                         }
                     }
                 }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(118.dp),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(this.maxLineSpan) }) {
-                        val headerText = when (selectedCategory) {
-                            "Movies" -> "Trending Movies"
-                            "TV" -> "Trending Shows & Dramas"
-                            "Anime" -> "Trending Anime"
-                            else -> "Trending Searches"
-                        }
-                        Text(headerText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (defaultList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No items found in $selectedCategory",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
-                    items(defaultList) { anime ->
-                        AnimeCard(anime = anime, onClick = { onAnimeClick(anime.malId) })
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(110.dp),
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(defaultList) { anime ->
+                            AnimeGridCard(anime = anime, onClick = { onAnimeClick(anime.malId) })
+                        }
                     }
                 }
             }
@@ -2303,9 +2419,7 @@ fun SearchScreen(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit, onNaviga
     }
 }
 
-// ==========================================
-// 3. SHOWS & MOVIES (DramasMoviesPage.jsx parity)
-// ==========================================
+// Shows & Movies Screen
 @Composable
 fun DramasMoviesPage(viewModel: MainViewModel, navController: NavHostController, onAnimeClick: (Int) -> Unit) {
     val tvShows by viewModel.tvShowsList.collectAsState()
@@ -2402,9 +2516,7 @@ fun DramasMoviesPage(viewModel: MainViewModel, navController: NavHostController,
     }
 }
 
-// ==========================================
-// 4. SCHEDULE SCREEN (SchedulePage.jsx parity)
-// ==========================================
+// Schedule Screen
 @Composable
 fun SchedulePage(viewModel: MainViewModel, onAnimeClick: (Int) -> Unit) {
     val reminders by viewModel.reminders.collectAsState()
@@ -2619,7 +2731,21 @@ fun scheduleAiringNotification(context: android.content.Context, item: com.examp
             }
         }
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             alarmManager.setExactAndAllowWhileIdle(
                 android.app.AlarmManager.RTC_WAKEUP,
                 calendar.timeInMillis,
@@ -2686,9 +2812,7 @@ fun cancelAiringNotification(context: android.content.Context, item: com.example
     }
 }
 
-// ==========================================
-// 5. PROFILE SCREEN (ProfilePage.jsx parity)
-// ==========================================
+// Profile Screen
 @Composable
 fun ProfilePage(viewModel: MainViewModel, navController: NavHostController, onAnimeClick: (Int) -> Unit) {
     val user by viewModel.currentUser.collectAsState()
@@ -3217,6 +3341,7 @@ fun AuthScreen(viewModel: MainViewModel) {
     var passwordVisible by remember { mutableStateOf(false) }
 
     val authError by viewModel.authError.collectAsState()
+    val isAuthLoading by viewModel.isAuthLoading.collectAsState()
 
     LaunchedEffect(isSignUp) {
         viewModel.clearAuthError()
@@ -3237,7 +3362,7 @@ fun AuthScreen(viewModel: MainViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AsyncImage(
-                model = "https://github.com/animevaultofficial/animevaultofficial.github.io/blob/main/logo.png?raw=true",
+                model = R.drawable.ic_logo,
                 contentDescription = "AnimeVault Logo",
                 modifier = Modifier
                     .size(80.dp)
@@ -3341,22 +3466,32 @@ fun AuthScreen(viewModel: MainViewModel) {
             // Submit Button
             Button(
                 onClick = {
-                    if (isSignUp) {
-                        viewModel.register(email, username, password)
-                    } else {
-                        viewModel.loginWithPassword(username, password)
+                    if (!isAuthLoading) {
+                        if (isSignUp) {
+                            viewModel.register(email, username, password)
+                        } else {
+                            viewModel.loginWithPassword(username, password)
+                        }
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
+                enabled = !isAuthLoading,
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    text = if (isSignUp) "Sign Up Now" else "Login Now",
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
-                )
+                if (isAuthLoading) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Text(
+                        text = if (isSignUp) "Sign Up Now" else "Login Now",
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -3393,39 +3528,33 @@ fun AuthScreen(viewModel: MainViewModel) {
             HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f))
             Spacer(Modifier.height(16.dp))
 
-            Text("OR BYPASS WITH", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-            Spacer(Modifier.height(10.dp))
-
-            // Guest Mode / Legacy Login Bypass
-            Button(
+            OutlinedButton(
                 onClick = { 
                     viewModel.login("guest@vault.com", "LegendaryOtaku")
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Guest Mode (Auto Bypass)", color = Color.Black, fontWeight = FontWeight.Black)
+                    Text("Continue as Guest")
                 }
             }
         }
     }
 }
 
-// ==========================================
-// 6. DETAIL SCREEN (AnimeDetailsPage.jsx parity)
-// ==========================================
+// Detail Screen
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DetailScreen(id: Int, viewModel: MainViewModel, onBack: () -> Unit, onPlay: (Int) -> Unit, onGenreClick: () -> Unit) {
+fun DetailScreen(id: Int, viewModel: MainViewModel, onBack: () -> Unit, onPlay: (Int, Int) -> Unit, onGenreClick: () -> Unit) {
     val state by viewModel.detailState.collectAsState()
     val isLiked = viewModel.isFavorite(id)
     val context = LocalContext.current
+    var selectedSeason by remember { mutableStateOf(1) }
 
     LaunchedEffect(id) {
         viewModel.loadAnimeDetails(id)
@@ -3564,7 +3693,7 @@ fun DetailScreen(id: Int, viewModel: MainViewModel, onBack: () -> Unit, onPlay: 
                             Button(
                                 onClick = {
                                     viewModel.watchEpisode(anime, 1)
-                                    onPlay(1)
+                                    onPlay(selectedSeason, 1)
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -3577,6 +3706,53 @@ fun DetailScreen(id: Int, viewModel: MainViewModel, onBack: () -> Unit, onPlay: 
                             }
                             
                             Spacer(modifier = Modifier.height(24.dp))
+                            
+                            val maxSeasons = remember(anime) {
+                                when (anime.malId) {
+                                    2001 -> 5 // Breaking Bad
+                                    2002 -> 4 // Stranger Things
+                                    2003 -> 2 // Squid Game
+                                    2006 -> 2 // The Last of Us
+                                    else -> if (anime.mediaType == "tv") 2 else if (anime.mediaType == "anime" && (anime.episodes ?: 0) > 12) 2 else 1
+                                }
+                            }
+                            
+                            if (maxSeasons > 1) {
+                                Text(
+                                    text = "Seasons",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    for (seasonNum in 1..maxSeasons) {
+                                        val isSelected = selectedSeason == seasonNum
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primary 
+                                                    else MaterialTheme.colorScheme.surfaceVariant
+                                                )
+                                                .clickable { selectedSeason = seasonNum }
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = "Season $seasonNum",
+                                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(24.dp))
+                            }
+                            
                             Text(
                                 text = "Episodes",
                                 style = MaterialTheme.typography.titleMedium,
@@ -3595,7 +3771,7 @@ fun DetailScreen(id: Int, viewModel: MainViewModel, onBack: () -> Unit, onPlay: 
                                     Button(
                                         onClick = {
                                             viewModel.watchEpisode(anime, i)
-                                            onPlay(i)
+                                            onPlay(selectedSeason, i)
                                         },
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(0.dp),
@@ -3632,12 +3808,10 @@ fun DetailScreen(id: Int, viewModel: MainViewModel, onBack: () -> Unit, onPlay: 
     }
 }
 
-// ==========================================
-// 7. STREAMING PLAYER SCREEN (PlayerScreen.jsx parity)
-// ==========================================
+// Streaming Player Screen
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun PlayerScreen(animeId: Int, episode: Int = 1, viewModel: MainViewModel, onBack: () -> Unit) {
+fun PlayerScreen(animeId: Int, season: Int = 1, episode: Int = 1, viewModel: MainViewModel, onBack: () -> Unit) {
     val detailState by viewModel.detailState.collectAsState()
     
     // Get the media object to check its actual type
@@ -3647,18 +3821,17 @@ fun PlayerScreen(animeId: Int, episode: Int = 1, viewModel: MainViewModel, onBac
     
     // Determine media type: first from mediaType field, then from ID range as fallback
     val isMovie = remember(mediaItem, animeId) { 
-        mediaItem?.mediaType == "movie" || animeId in 10000..19999
+        mediaItem?.mediaType == "movie" || animeId in 10000..19999 || animeId in 1001..1999
     }
     val isTvShow = remember(mediaItem, animeId) { 
-        mediaItem?.mediaType == "tv" || animeId in 20000..29999
+        mediaItem?.mediaType == "tv" || animeId in 20000..29999 || animeId in 2001..2999
     }
     val isMovieOrShow = isMovie || isTvShow
 
     var lang by remember { mutableStateOf("sub") } // "sub" or "dub"
     var blockedCount by remember { mutableStateOf(0) }
     var watchProgress by remember { mutableStateOf(0) } // Track watch progress
-    
-    val season = 1 // Default to season 1 for TV shows
+    var webViewRef by remember { mutableStateOf<android.webkit.WebView?>(null) }
     
     val url = remember(animeId, episode, lang, isMovie, isTvShow, season) {
         if (isMovieOrShow) {
@@ -3696,6 +3869,67 @@ fun PlayerScreen(animeId: Int, episode: Int = 1, viewModel: MainViewModel, onBac
                     settings.mediaPlaybackRequiresUserGesture = false
                     settings.javaScriptCanOpenWindowsAutomatically = false
                     
+                    // Inject script to listen for player messages and block ads
+                    val progressScript = """
+                        (function() {
+                            // Block popup mechanisms
+                            try {
+                                window.open = function() { return null; };
+                                window.alert = function() { return null; };
+                                window.confirm = function() { return null; };
+                                window.prompt = function() { return null; };
+                            } catch(e) {}
+
+                            var adSelectors = [
+                                "[id*='ad-']", "[id*='ads']", "[class*='ad-']", "[class*='ads']",
+                                "[id*='advertisement']", "[class*='advertisement']",
+                                "[id*='sponsor']", "[class*='sponsor']", "[id*='banner']", "[class*='banner']",
+                                "iframe[src*='ads']", "iframe[src*='google']", "iframe[src*='doubleclick']",
+                                "iframe[src*='googlesyndication']", "iframe[src*='adservice']", "script[src*='ads']"
+                            ];
+
+                            var removeAds = function() {
+                                adSelectors.forEach(function(sel) {
+                                    try {
+                                        document.querySelectorAll(sel).forEach(function(el) {
+                                            if (el && el.parentNode) {
+                                                el.style.display = 'none';
+                                                el.remove();
+                                            }
+                                        });
+                                    } catch (e) {}
+                                });
+
+                                try {
+                                    document.querySelectorAll('script').forEach(function(script) {
+                                        var src = (script.src || '').toLowerCase();
+                                        if (src.includes('ads') || src.includes('google') || src.includes('analytics') || src.includes('doubleclick')) {
+                                            script.remove();
+                                        }
+                                    });
+                                } catch (e) {}
+                            };
+
+                            removeAds();
+                            window.setInterval(removeAds, 1500);
+                            window.setTimeout(removeAds, 500);
+                            window.setTimeout(removeAds, 2000);
+
+                            window.addEventListener('message', function (event) {
+                                try {
+                                    if (typeof event.data === 'string') {
+                                        var data = JSON.parse(event.data);
+                                        if (data.progress) {
+                                            window.VideoasyProgress.receiveProgress(event.data);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error('Error processing message:', e);
+                                }
+                            });
+                        })();
+                    """.trimIndent()
+                    
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(
                             view: WebView?,
@@ -3703,16 +3937,54 @@ fun PlayerScreen(animeId: Int, episode: Int = 1, viewModel: MainViewModel, onBac
                         ): android.webkit.WebResourceResponse? {
                             val requestUrl = request?.url?.toString() ?: return null
                             if (isAdOrTracker(requestUrl)) {
-                                view?.post {
-                                    blockedCount++
-                                }
+                                view?.post { blockedCount++ }
                                 return android.webkit.WebResourceResponse(
-                                    "text/plain", 
-                                    "UTF-8", 
+                                    "text/plain",
+                                    "UTF-8",
                                     java.io.ByteArrayInputStream(ByteArray(0))
                                 )
                             }
                             return super.shouldInterceptRequest(view, request)
+                        }
+
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: android.webkit.WebResourceRequest?
+                        ): Boolean {
+                            val requestUrl = request?.url?.toString() ?: return false
+                            if (isAdOrTracker(requestUrl)) {
+                                view?.post { blockedCount++ }
+                                return true
+                            }
+                            
+                            // Prevent malicious popups and redirect hijacks on the main frame:
+                            val isMainFrame = request?.isForMainFrame == true
+                            if (isMainFrame) {
+                                val originalUri = try { android.net.Uri.parse(url) } catch (e: Exception) { null }
+                                val targetUri = request?.url
+                                if (originalUri != null && targetUri != null) {
+                                    val origHost = originalUri.host?.lowercase() ?: ""
+                                    val targetHost = targetUri.host?.lowercase() ?: ""
+                                    if (targetHost.isNotEmpty() && !targetHost.contains(origHost) && !origHost.contains(targetHost)) {
+                                        // Block different-domain navigations on main frame to prevent hijack popups
+                                        view?.post { blockedCount++ }
+                                        return true
+                                    }
+                                }
+                            }
+                            return super.shouldOverrideUrlLoading(view, request)
+                        }
+
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            view?.post { blockedCount = 0 }
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            view?.post {
+                                view.evaluateJavascript(progressScript) {}
+                            }
                         }
                     }
                     webChromeClient = WebChromeClient()
@@ -3738,66 +4010,10 @@ fun PlayerScreen(animeId: Int, episode: Int = 1, viewModel: MainViewModel, onBac
                         }
                     }, "VideoasyProgress")
                     
-                    // Inject script to listen for player messages and block ads
-                    val progressScript = """
-                        // Block ad scripts before they load
-                        window.addEventListener("beforeunload", function() {
-                            var scripts = document.querySelectorAll("script");
-                            scripts.forEach(function(s) {
-                                var src = s.src || "";
-                                if (src.includes("ads.") || src.includes("google") || src.includes("analytics") || 
-                                    src.includes("advertising") || src.includes("doubleclick")) {
-                                    s.remove();
-                                }
-                            });
-                        });
-                        
-                        // Remove ad elements and iframes
-                        var removeAds = function() {
-                            var adSelectors = [
-                                "[id*='ad-']", "[id*='ads']", "[class*='ad-']", "[class*='ads']",
-                                "[id*='advertisement']", "[class*='advertisement']",
-                                "[id*='sponsor']", "[class*='sponsor']",
-                                "[id*='banner']", "[class*='banner']",
-                                "iframe[src*='ads']", "iframe[src*='google']", "iframe[src*='doubleclick']"
-                            ];
-                            adSelectors.forEach(function(sel) {
-                                try {
-                                    document.querySelectorAll(sel).forEach(function(el) {
-                                        el.style.display = "none";
-                                        el.remove();
-                                    });
-                                } catch (e) {}
-                            });
-                        };
-                        
-                        removeAds();
-                        setInterval(removeAds, 2000);
-                        
-                        // Track player progress
-                        window.addEventListener("message", function (event) {
-                            try {
-                                if (typeof event.data === "string") {
-                                    var data = JSON.parse(event.data);
-                                    if (data.progress) {
-                                        window.VideoasyProgress.receiveProgress(event.data);
-                                    }
-                                }
-                            } catch (e) {
-                                console.error("Error processing message:", e);
-                            }
-                        });
-                    """.trimIndent()
-                    
-                    setWebViewClient(object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            view?.evaluateJavascript(progressScript) {}
-                        }
-                    })
                 }
             },
             update = { webView ->
+                webViewRef = webView
                 if (webView.tag != url) {
                     webView.tag = url
                     android.util.Log.d("PlayerScreen", "Loading player url: $url (animeId=$animeId episode=$episode)")
@@ -3820,12 +4036,57 @@ fun PlayerScreen(animeId: Int, episode: Int = 1, viewModel: MainViewModel, onBac
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close", tint = Color.White)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close", tint = Color.White)
+                    }
+
+                    IconButton(
+                        onClick = {
+                            webViewRef?.reload()
+                        },
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50))
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Reload Stream", tint = Color.White)
+                    }
+
+                    Button(
+                        onClick = {
+                            webViewRef?.tag = null
+                            webViewRef?.loadUrl(url)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black.copy(alpha = 0.7f),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .height(38.dp)
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(50))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Retry",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Retry Stream",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 
                 // Ad block active badge
@@ -3882,7 +4143,7 @@ fun isAdOrTracker(url: String): Boolean {
         "google-analytics.com", "analytics.google.com", "googletagmanager.com",
         "googletagservices.com", "doubleclick.net", "adservice.google",
         "pagead2.googlesyndication.com", "stats.g.doubleclick.net",
-        "fonts.googleapis.com", "fonts.gstatic.com", "googleapis.com", "gstatic.com",
+        "fonts.googleapis.com", "fonts.gstatic.com",
         // Ad networks
         "cdn.adx1.com", "intelligenceadx.com", "adsco.re", "mc.yandex.com",
         "mc.yandex.ru", "bvtpk.com", "my.rtmark.net", "b7510.com",

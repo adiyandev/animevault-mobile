@@ -144,6 +144,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
 
+    private val _isAuthLoading = MutableStateFlow(false)
+    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
+
     private val _favorites = MutableStateFlow<List<Anime>>(emptyList())
     val favorites: StateFlow<List<Anime>> = _favorites.asStateFlow()
 
@@ -170,6 +173,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         loadCurrentUserFromPrefs()
         loadRemindersFromPrefs()
+        viewModelScope.launch {
+            try {
+                com.example.data.db.NeonDatabaseHelper.initDatabase()
+            } catch (t: Throwable) {
+                android.util.Log.e("MainViewModel", "Database init failed safely: ${t.message}", t)
+            }
+        }
     }
 
     private fun saveCurrentUserToPrefs(user: User) {
@@ -183,6 +193,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .putInt(profileXpNeededKey, user.xpNeeded)
             .putInt(profileWatchTimeKey, user.totalWatchTime)
             .apply()
+
+        viewModelScope.launch {
+            try {
+                com.example.data.db.NeonDatabaseHelper.saveUserStatsInDb(
+                    user.username,
+                    user.level,
+                    user.xp,
+                    user.xpNeeded,
+                    user.totalWatchTime
+                )
+            } catch (t: Throwable) {
+                android.util.Log.e("MainViewModel", "Failed to save user stats safely: ${t.message}", t)
+            }
+        }
     }
 
     private fun loadCurrentUserFromPrefs() {
@@ -329,58 +353,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Beautiful Curated Local Fallback Database of Legendary Anime to guarantee instant high-fidelity loading!
     val localTrendingAnime = listOf(
-        Anime(7, "Death Note", "Death Note", createAnimeImages("https://cdn.pixabay.com/photo/2020/05/20/19/27/death-note-5202159_1280.jpg"), 8.6, "A student discovers a notebook that can kill anyone whose name is written in it.", 37, "Finished Airing", 2006, listOf(Genre("Mystery"), Genre("Psychological"))),
-        Anime(20, "Monster", "Monster", createAnimeImages("https://images.unsplash.com/photo-1519337265831-281ec6cc8514?auto=format&fit=crop&w=400&q=80"), 9.0, "A brilliant neurosurgeon saves a boy and becomes entangled in a dark conspiracy as he hunts for the boy he once saved.", 74, "Finished Airing", 2004, listOf(Genre("Mystery"), Genre("Psychological"), Genre("Thriller"))),
-        Anime(21, "Classroom of the Elite", "Classroom of the Elite", createAnimeImages("https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=400&q=80"), 7.6, "A school where only the best advance, and students scheme for status in a ruthless meritocracy.", 12, "Finished Airing", 2017, listOf(Genre("Drama"), Genre("School"), Genre("Psychological"))),
-        Anime(22, "Tonikawa: Over the Moon For You", "Tonikawa", createAnimeImages("https://images.unsplash.com/photo-1529336953128-8a08e5a1d7b6?auto=format&fit=crop&w=400&q=80"), 7.8, "A newly married couple navigate life, love, and the comedic trials of married life after a fateful meeting.", 12, "Finished Airing", 2020, listOf(Genre("Romance"), Genre("Comedy")))
+        Anime(1535, "Death Note", "Death Note", createAnimeImages("https://cdn.myanimelist.net/images/anime/9/9453l.jpg"), 8.6, "A student discovers a notebook that can kill anyone whose name is written in it.", 37, "Finished Airing", 2006, listOf(Genre("Mystery"), Genre("Psychological"))),
+        Anime(19, "Monster", "Monster", createAnimeImages("https://cdn.myanimelist.net/images/anime/10/18793l.jpg"), 9.0, "A brilliant neurosurgeon saves a boy and becomes entangled in a dark conspiracy as he hunts for the boy he once saved.", 74, "Finished Airing", 2004, listOf(Genre("Mystery"), Genre("Psychological"), Genre("Thriller"))),
+        Anime(35507, "Classroom of the Elite", "Classroom of the Elite", createAnimeImages("https://anitrendz.net/news/wp-content/uploads/2023/10/Classroom-of-the-Elite-Season-3-KV-16x9-1.png"), 7.6, "A school where only the best advance, and students scheme for status in a ruthless meritocracy.", 12, "Finished Airing", 2017, listOf(Genre("Drama"), Genre("School"), Genre("Psychological"))),
+        Anime(41389, "Tonikawa: Over the Moon For You", "Tonikawa", createAnimeImages("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQDFUbbzmTGwNhxUt3_CisoFTRogi2RM2fCDWlvDdvNnbYQ3KH7R-BwqBe1&s=10"), 7.8, "A newly married couple navigate life, love, and the comedic trials of married life after a fateful meeting.", 12, "Finished Airing", 2020, listOf(Genre("Romance"), Genre("Comedy")))
     )
 
     val localPopularAnime = listOf(
-        Anime(6, "Fullmetal Alchemist: Brotherhood", "Fullmetal Alchemist", createAnimeImages("https://cdn.pixabay.com/photo/2016/11/29/08/42/brothers-1868500_1280.jpg"), 9.2, "Two brothers use alchemy in an attempt to bring their mother back to life.", 64, "Finished Airing", 2009, listOf(Genre("Drama"), Genre("Fantasy"))),
-        Anime(7, "Death Note", "Death Note", createAnimeImages("https://cdn.pixabay.com/photo/2020/05/20/19/27/death-note-5202159_1280.jpg"), 8.6, "A student discovers a notebook that can kill anyone whose name is written in it.", 37, "Finished Airing", 2006, listOf(Genre("Mystery"), Genre("Psychological"))),
-        Anime(8, "Hunter x Hunter (2011)", "Hunter x Hunter", createAnimeImages("https://cdn.pixabay.com/photo/2020/06/15/15/22/hunter-x-hunter-5302220_1280.jpg"), 9.0, "Gon Freecss seeks to become a Legendary Hunter to find his long-lost father.", 148, "Finished Airing", 2011, listOf(Genre("Adventure"), Genre("Action"))),
-        Anime(9, "My Hero Academia", "My Hero Academia", createAnimeImages("https://cdn.pixabay.com/photo/2021/04/06/20/02/midoriya-izuku-6157345_1280.jpg"), 8.0, "In a world of superheroes, a boy born without quirks trains to inherit powers.", 138, "Currently Airing", 2016, listOf(Genre("Action"), Genre("School")))
+        Anime(5114, "Fullmetal Alchemist: Brotherhood", "Fullmetal Alchemist", createAnimeImages("https://cdn.myanimelist.net/images/anime/1223/96541l.jpg"), 9.2, "Two brothers use alchemy in an attempt to bring their mother back to life.", 64, "Finished Airing", 2009, listOf(Genre("Drama"), Genre("Fantasy"))),
+        Anime(1535, "Death Note", "Death Note", createAnimeImages("https://cdn.myanimelist.net/images/anime/9/9453l.jpg"), 8.6, "A student discovers a notebook that can kill anyone whose name is written in it.", 37, "Finished Airing", 2006, listOf(Genre("Mystery"), Genre("Psychological"))),
+        Anime(11061, "Hunter x Hunter (2011)", "Hunter x Hunter", createAnimeImages("https://cdn.myanimelist.net/images/anime/1337/99013l.jpg"), 9.0, "Gon Freecss seeks to become a Legendary Hunter to find his long-lost father.", 148, "Finished Airing", 2011, listOf(Genre("Adventure"), Genre("Action"))),
+        Anime(31964, "My Hero Academia", "My Hero Academia", createAnimeImages("https://cdn.myanimelist.net/images/anime/10/78745l.jpg"), 8.0, "In a world of superheroes, a boy born without quirks trains to inherit powers.", 138, "Currently Airing", 2016, listOf(Genre("Action"), Genre("School")))
     )
 
     val localUpcomingAnime = listOf(
-        Anime(10, "Chainsaw Man Movie: Reze-hen", "Chainsaw Man Movie", createAnimeImages("https://cdn.pixabay.com/photo/2023/04/09/20/01/anime-7912235_1280.jpg"), 8.9, "Denji encounters a mysterious girl named Reze in a cafe.", 1, "Not Yet Aired", 2026, listOf(Genre("Action"), Genre("Romance"))),
-        Anime(11, "Bleach: Thousand-Year Blood War Part 3", "Bleach TYBW Part 3", createAnimeImages("https://cdn.pixabay.com/photo/2022/10/24/09/20/ichigo-7543048_1280.jpg"), 9.0, "Ichigo and his allies fight to save the Soul Society from the Quincy empire.", 13, "Not Yet Aired", 2026, listOf(Genre("Action"), Genre("Fantasy")))
+        Anime(57658, "Chainsaw Man Movie: Reze-hen", "Chainsaw Man Movie", createAnimeImages("https://cdn.myanimelist.net/images/anime/1806/126216l.jpg"), 8.9, "Denji encounters a mysterious girl named Reze in a cafe.", 1, "Not Yet Aired", 2026, listOf(Genre("Action"), Genre("Romance"))),
+        Anime(56220, "Bleach: Thousand-Year Blood War Part 3", "Bleach TYBW Part 3", createAnimeImages("https://cdn.myanimelist.net/images/anime/1164/127321l.jpg"), 9.0, "Ichigo and his allies fight to save the Soul Society from the Quincy empire.", 13, "Not Yet Aired", 2026, listOf(Genre("Action"), Genre("Fantasy")))
     )
 
     val localSeasonalAnime = listOf(
-        Anime(12, "Frieren: Beyond Journey's End", "Frieren", createAnimeImages("https://cdn.pixabay.com/photo/2024/02/25/11/40/frieren-8595679_1280.jpg"), 9.3, "An elf mage re-evaluates her relationships with mortals long after defeating the Demon King.", 28, "Currently Airing", 2024, listOf(Genre("Adventure"), Genre("Fantasy"))),
-        Anime(13, "Spy x Family Season 2", "Spy x Family", createAnimeImages("https://cdn.pixabay.com/photo/2022/05/18/14/40/anya-forger-7205435_1280.jpg"), 8.4, "A spy, an assassin, and a telepath form a fake family to keep world peace.", 12, "Finished Airing", 2023, listOf(Genre("Comedy"), Genre("Action")))
+        Anime(52991, "Frieren: Beyond Journey's End", "Frieren", createAnimeImages("https://cdn.myanimelist.net/images/anime/1015/138075l.jpg"), 9.3, "An elf mage re-evaluates her relationships with mortals long after defeating the Demon King.", 28, "Currently Airing", 2024, listOf(Genre("Adventure"), Genre("Fantasy"))),
+        Anime(54595, "Spy x Family Season 2", "Spy x Family", createAnimeImages("https://cdn.myanimelist.net/images/anime/1441/122795l.jpg"), 8.4, "A spy, an assassin, and a telepath form a fake family to keep world peace.", 12, "Finished Airing", 2023, listOf(Genre("Comedy"), Genre("Action")))
     )
 
     val localMovies = listOf(
-        Anime(1001, "Interstellar", "Interstellar", createAnimeImages("https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80"), 8.7, "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.", 1, "Movie", 2014, listOf(Genre("Sci-Fi"), Genre("Adventure"), Genre("Drama")), mediaType = "movie"),
-        Anime(1002, "The Dark Knight", "The Dark Knight", createAnimeImages("https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=400&q=80"), 9.0, "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.", 1, "Movie", 2008, listOf(Genre("Action"), Genre("Crime"), Genre("Drama")), mediaType = "movie"),
-        Anime(1003, "Oppenheimer", "Oppenheimer", createAnimeImages("https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=400&q=80"), 8.4, "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb.", 1, "Movie", 2023, listOf(Genre("Biography"), Genre("Drama"), Genre("History")), mediaType = "movie"),
-        Anime(1004, "Inception", "Inception", createAnimeImages("https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80"), 8.8, "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.", 1, "Movie", 2010, listOf(Genre("Sci-Fi"), Genre("Action"), Genre("Adventure")), mediaType = "movie"),
-        Anime(1005, "Spirited Away", "Spirited Away", createAnimeImages("https://cdn.pixabay.com/photo/2020/05/20/19/27/spirited-away-5202159_1280.jpg"), 8.9, "A young girl wanders into a world ruled by gods, witches, and spirits.", 1, "Movie", 2001, listOf(Genre("Adventure"), Genre("Fantasy")), mediaType = "movie"),
-        Anime(1006, "Your Name.", "Your Name.", createAnimeImages("https://cdn.pixabay.com/photo/2020/05/01/16/00/anime-5117769_1280.jpg"), 8.8, "Two high school students swap bodies and must find a way to meet.", 1, "Movie", 2016, listOf(Genre("Romance"), Genre("Drama")), mediaType = "movie"),
-        Anime(1007, "Parasite", "Parasite", createAnimeImages("https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=400&q=80"), 8.6, "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.", 1, "Movie", 2019, listOf(Genre("Thriller"), Genre("Drama")), mediaType = "movie")
+        Anime(1001, "Interstellar", "Interstellar", createAnimeImages("https://image.tmdb.org/t/p/w500/gEU2Qv6Xg778YvG6eR3v3mYgYvA.jpg"), 8.7, "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.", 1, "Movie", 2014, listOf(Genre("Sci-Fi"), Genre("Adventure"), Genre("Drama")), mediaType = "movie"),
+        Anime(1002, "The Dark Knight", "The Dark Knight", createAnimeImages("https://image.tmdb.org/t/p/w500/kYg1v6TS7mB9mOf6I690ga0v9U7.jpg"), 9.0, "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.", 1, "Movie", 2008, listOf(Genre("Action"), Genre("Crime"), Genre("Drama")), mediaType = "movie"),
+        Anime(1003, "Oppenheimer", "Oppenheimer", createAnimeImages("https://image.tmdb.org/t/p/w500/8Gxv2gSjBeY2gfvYvA6R6v3mYgYvA.jpg"), 8.4, "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb.", 1, "Movie", 2023, listOf(Genre("Biography"), Genre("Drama"), Genre("History")), mediaType = "movie"),
+        Anime(1004, "Inception", "Inception", createAnimeImages("https://image.tmdb.org/t/p/w500/edv5CZvY0u4asO66Z8ZgTYOi4Ls.jpg"), 8.8, "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.", 1, "Movie", 2010, listOf(Genre("Sci-Fi"), Genre("Action"), Genre("Adventure")), mediaType = "movie"),
+        Anime(1005, "Spirited Away", "Spirited Away", createAnimeImages("https://cdn.myanimelist.net/images/anime/6/79597l.jpg"), 8.9, "A young girl wanders into a world ruled by gods, witches, and spirits.", 1, "Movie", 2001, listOf(Genre("Adventure"), Genre("Fantasy")), mediaType = "movie"),
+        Anime(1006, "Your Name.", "Your Name.", createAnimeImages("https://cdn.myanimelist.net/images/anime/5/87048l.jpg"), 8.8, "Two high school students swap bodies and must find a way to meet.", 1, "Movie", 2016, listOf(Genre("Romance"), Genre("Drama")), mediaType = "movie"),
+        Anime(1007, "Parasite", "Parasite", createAnimeImages("https://image.tmdb.org/t/p/w500/7IiTT0CH79Gz7v69uW7v69uW7v69.jpg"), 8.6, "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.", 1, "Movie", 2019, listOf(Genre("Thriller"), Genre("Drama")), mediaType = "movie")
     )
 
     val localTvShows = listOf(
-        Anime(2001, "Breaking Bad", "Breaking Bad", createAnimeImages("https://images.unsplash.com/photo-1560169897-fc0cdbdfa4d5?auto=format&fit=crop&w=400&q=80"), 9.5, "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student in order to secure his family's future.", 62, "TV", 2008, listOf(Genre("Crime"), Genre("Drama"), Genre("Thriller")), mediaType = "tv"),
-        Anime(2002, "Stranger Things", "Stranger Things", createAnimeImages("https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80"), 8.7, "When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces and one strange little girl.", 42, "TV", 2016, listOf(Genre("Sci-Fi"), Genre("Horror"), Genre("Drama")), mediaType = "tv"),
-        Anime(2003, "Squid Game", "Squid Game", createAnimeImages("https://images.unsplash.com/photo-1627856013091-fed6e4e30025?auto=format&fit=crop&w=400&q=80"), 8.0, "Hundreds of cash-strapped players accept a strange invitation to compete in children's games. Inside, a tempting prize awaits with deadly high stakes.", 9, "TV", 2021, listOf(Genre("Thriller"), Genre("Drama"), Genre("Action")), mediaType = "tv"),
-        Anime(2004, "Crash Landing on You", "Crash Landing on You", createAnimeImages("https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=400&q=80"), 8.7, "The absolute top-secret love story of a chaebol heiress who made a forced landing in North Korea because of a paragliding accident and a North Korean special officer.", 16, "TV", 2019, listOf(Genre("Romance"), Genre("Comedy"), Genre("Drama")), mediaType = "tv"),
-        Anime(2005, "Queen of Tears", "Queen of Tears", createAnimeImages("https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=400&q=80"), 8.4, "The queen of department stores and her small-town husband weather a marital crisis until love miraculously begins to bloom again.", 16, "TV", 2024, listOf(Genre("Romance"), Genre("Drama"), Genre("Comedy")), mediaType = "tv"),
-        Anime(2006, "The Last of Us", "The Last of Us", createAnimeImages("https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80"), 8.8, "After a global pandemic destroys civilization, a hardened survivor takes charge of a 14-year-old girl who may be humanity's last hope.", 9, "TV", 2023, listOf(Genre("Action"), Genre("Drama"), Genre("Sci-Fi")), mediaType = "tv"),
-        Anime(2007, "Goblin: The Lonely and Great God", "Goblin (Guardian)", createAnimeImages("https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=400&q=80"), 8.6, "In his quest for a bride to break his immortal curse, a 939-year-old guardian of souls meets a cheerful grim reaper and a sprightly student.", 16, "TV", 2016, listOf(Genre("Fantasy"), Genre("Romance"), Genre("Drama")), mediaType = "tv")
+        Anime(2001, "Breaking Bad", "Breaking Bad", createAnimeImages("https://image.tmdb.org/t/p/w500/ztkUQv6Xg778YvG6eR3v3mYgYvA.jpg"), 9.5, "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student in order to secure his family's future.", 62, "TV", 2008, listOf(Genre("Crime"), Genre("Drama"), Genre("Thriller")), mediaType = "tv"),
+        Anime(2002, "Stranger Things", "Stranger Things", createAnimeImages("https://image.tmdb.org/t/p/w500/x2L68m2bA66AI4vT7vU886uW7vA.jpg"), 8.7, "When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces and one strange little girl.", 42, "TV", 2016, listOf(Genre("Sci-Fi"), Genre("Horror"), Genre("Drama")), mediaType = "tv"),
+        Anime(2003, "Squid Game", "Squid Game", createAnimeImages("https://image.tmdb.org/t/p/w500/d57gGAt9gH3S5886uW7vA69uW7.jpg"), 8.0, "Hundreds of cash-strapped players accept a strange invitation to compete in children's games. Inside, a tempting prize awaits with deadly high stakes.", 9, "TV", 2021, listOf(Genre("Thriller"), Genre("Drama"), Genre("Action")), mediaType = "tv"),
+        Anime(2004, "Crash Landing on You", "Crash Landing on You", createAnimeImages("https://image.tmdb.org/t/p/w500/b8782O86U7Lg0bEa6aN7v69uW7.jpg"), 8.7, "The absolute top-secret love story of a chaebol heiress who made a forced landing in North Korea because of a paragliding accident and a North Korean special officer.", 16, "TV", 2019, listOf(Genre("Romance"), Genre("Comedy"), Genre("Drama")), mediaType = "tv"),
+        Anime(2005, "Queen of Tears", "Queen of Tears", createAnimeImages("https://image.tmdb.org/t/p/w500/h9W6Xg778YvG6eR3v3mYgYvA.jpg"), 8.4, "The queen of department stores and her small-town husband weather a marital crisis until love miraculously begins to bloom again.", 16, "TV", 2024, listOf(Genre("Romance"), Genre("Drama"), Genre("Comedy")), mediaType = "tv"),
+        Anime(2006, "The Last of Us", "The Last of Us", createAnimeImages("https://image.tmdb.org/t/p/w500/g9W6Xg778YvG6eR3v3mYgYvA.jpg"), 8.8, "After a global pandemic destroys civilization, a hardened survivor takes charge of a 14-year-old girl who may be humanity's last hope.", 9, "TV", 2023, listOf(Genre("Action"), Genre("Drama"), Genre("Sci-Fi")), mediaType = "tv"),
+        Anime(2007, "Goblin: The Lonely and Great God", "Goblin (Guardian)", createAnimeImages("https://image.tmdb.org/t/p/w500/h9W6Xg778YvG6eR3v3mYgYvA.jpg"), 8.6, "In his quest for a bride to break his immortal curse, a 939-year-old guardian of souls meets a cheerful grim reaper and a sprightly student.", 16, "TV", 2016, listOf(Genre("Fantasy"), Genre("Romance"), Genre("Drama")), mediaType = "tv")
     )
 
     val localAiringSchedule = listOf(
-        AiringItem(1, 12, "Frieren: Beyond Journey's End", "https://cdn.pixabay.com/photo/2024/02/25/11/40/frieren-8595679_1280.jpg", 28, "10:30 PM", "Airs in 3h 12m", 9.3, 5, getUtcTimestampForDayAndTime(5, "10:30 PM")), // Friday
-        AiringItem(2, 3, "Solo Leveling", "https://cdn.pixabay.com/photo/2024/01/29/18/14/manhwa-8540540_1280.jpg", 12, "11:00 PM", "Airs in 5h 45m", 8.5, 6, getUtcTimestampForDayAndTime(6, "11:00 PM")), // Saturday
-        AiringItem(3, 9, "My Hero Academia Season 7", "https://cdn.pixabay.com/photo/2021/04/06/20/02/midoriya-izuku-6157345_1280.jpg", 8, "05:30 PM", "Aired 2h ago", 8.0, 6, getUtcTimestampForDayAndTime(6, "05:30 PM")), // Saturday
-        AiringItem(4, 1, "Demon Slayer: Hasira Training Arc", "https://cdn.pixabay.com/photo/2020/09/25/11/30/demon-slayer-5601140_1280.jpg", 5, "11:15 PM", "Airs in 1d 4h", 8.7, 0, getUtcTimestampForDayAndTime(0, "11:15 PM")), // Sunday
-        AiringItem(5, 4, "Jujutsu Kaisen Season 2", "https://cdn.pixabay.com/photo/2021/06/18/11/22/jujutsu-kaisen-6345842_1280.jpg", 23, "11:56 PM", "Airs in 2d 12h", 8.8, 4, getUtcTimestampForDayAndTime(4, "11:56 PM")), // Thursday
-        AiringItem(6, 18, "Oshi no Ko Season 2", "https://cdn.pixabay.com/photo/2023/11/14/09/20/ai-hoshino-8387258_1280.jpg", 1, "09:00 PM", "Airs in 3d 5h", 8.5, 3, getUtcTimestampForDayAndTime(3, "09:00 PM")), // Wednesday
-        AiringItem(7, 5, "Chainsaw Man", "https://cdn.pixabay.com/photo/2023/04/09/20/01/anime-7912235_1280.jpg", 12, "08:30 PM", "Airs in 4d 2h", 8.6, 1, getUtcTimestampForDayAndTime(1, "08:30 PM")), // Monday
-        AiringItem(8, 2, "Attack on Titan Final Chapters", "https://cdn.pixabay.com/photo/2021/08/21/20/46/attack-on-titan-6563604_1280.jpg", 4, "10:00 PM", "Airs in 5d 1h", 9.1, 2, getUtcTimestampForDayAndTime(2, "10:00 PM"))  // Tuesday
+        AiringItem(1, 12, "Frieren: Beyond Journey's End", "https://cdn.myanimelist.net/images/anime/1015/138075l.jpg", 28, "10:30 PM", "Airs in 3h 12m", 9.3, 5, getUtcTimestampForDayAndTime(5, "10:30 PM")), // Friday
+        AiringItem(2, 3, "Solo Leveling", "https://cdn.myanimelist.net/images/anime/1433/140356l.jpg", 12, "11:00 PM", "Airs in 5h 45m", 8.5, 6, getUtcTimestampForDayAndTime(6, "11:00 PM")), // Saturday
+        AiringItem(3, 9, "My Hero Academia Season 7", "https://cdn.myanimelist.net/images/anime/10/78745l.jpg", 8, "05:30 PM", "Aired 2h ago", 8.0, 6, getUtcTimestampForDayAndTime(6, "05:30 PM")), // Saturday
+        AiringItem(4, 1, "Demon Slayer: Hasira Training Arc", "https://cdn.myanimelist.net/images/anime/1908/135188l.jpg", 5, "11:15 PM", "Airs in 1d 4h", 8.7, 0, getUtcTimestampForDayAndTime(0, "11:15 PM")), // Sunday
+        AiringItem(5, 4, "Jujutsu Kaisen Season 2", "https://cdn.myanimelist.net/images/anime/1792/138022l.jpg", 23, "11:56 PM", "Airs in 2d 12h", 8.8, 4, getUtcTimestampForDayAndTime(4, "11:56 PM")), // Thursday
+        AiringItem(6, 18, "Oshi no Ko Season 2", "https://cdn.myanimelist.net/images/anime/1812/142916l.jpg", 1, "09:00 PM", "Airs in 3d 5h", 8.5, 3, getUtcTimestampForDayAndTime(3, "09:00 PM")), // Wednesday
+        AiringItem(7, 5, "Chainsaw Man", "https://cdn.myanimelist.net/images/anime/1806/126216l.jpg", 12, "08:30 PM", "Airs in 4d 2h", 8.6, 1, getUtcTimestampForDayAndTime(1, "08:30 PM")), // Monday
+        AiringItem(8, 2, "Attack on Titan Final Chapters", "https://cdn.myanimelist.net/images/anime/1917/137160l.jpg", 4, "10:00 PM", "Airs in 5d 1h", 9.1, 2, getUtcTimestampForDayAndTime(2, "10:00 PM"))  // Tuesday
     )
 
     init {
@@ -465,8 +489,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             updateScheduleStates(currentScheduleList.toList())
 
             val days = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
+            val currentDayIdx = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1
 
+            // 1. Fetch current day's schedule first for instant display
+            try {
+                val dayName = days[currentDayIdx]
+                val response = api.getSchedules(filter = dayName, limit = 15)
+                val mapped = response.data.filterSafe().mapIndexed { itemIdx, anime ->
+                    AiringItem(
+                        id = currentDayIdx * 100 + itemIdx + 1,
+                        animeId = anime.malId,
+                        title = anime.displayTitle,
+                        imageUrl = anime.images?.webp?.largeImageUrl ?: anime.images?.jpg?.largeImageUrl ?: "",
+                        episode = (anime.episodes ?: 12),
+                        airingTime = "08:30 PM",
+                        countdown = "Airs today",
+                        rating = anime.score ?: 0.0,
+                        dayOfWeek = currentDayIdx,
+                        airingAt = getUtcTimestampForDayAndTime(currentDayIdx, "08:30 PM")
+                    )
+                }
+                synchronized(currentScheduleList) {
+                    currentScheduleList.removeAll { it.dayOfWeek == currentDayIdx }
+                    currentScheduleList.addAll(mapped.ifEmpty {
+                        localAiringSchedule.filter { it.dayOfWeek == currentDayIdx }
+                    })
+                    updateScheduleStates(currentScheduleList.toList())
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ScheduleComponent", "Failed to fetch immediate schedule for current day: ${e.message}")
+            }
+
+            // 2. Fetch other days in the background with a delay to avoid rate-limiting
             for (dayIdx in days.indices) {
+                if (dayIdx == currentDayIdx) continue
+                
+                delay(600)
                 val dayName = days[dayIdx]
                 try {
                     val response = api.getSchedules(filter = dayName, limit = 15)
@@ -497,94 +555,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         currentScheduleList.addAll(localAiringSchedule.filter { it.dayOfWeek == dayIdx })
                         updateScheduleStates(currentScheduleList.toList())
                     }
-                    android.util.Log.e("ScheduleComponent", "Failed to fetch schedule for $dayName: ${e.message}")
+                    android.util.Log.e("ScheduleComponent", "Failed to fetch background schedule for $dayName: ${e.message}")
                 }
-                delay(300)
             }
         }
     }
 
     fun loadMoviesAndTvShows() {
         viewModelScope.launch {
+            // 1. Instantly fetch the TVMaze discover page to get 250 highly popular shows
+            val fetchedShows = mutableListOf<Anime>()
+            var discoverPage: List<VideasyShow> = emptyList()
             try {
                 val videasy = RetrofitInstance.videasyApi
-
-                val popularQueries = listOf(
-                    "Breaking Bad", "Stranger Things", "The Last of Us", "Game of Thrones",
-                    "Wednesday", "The Boys", "Squid Game", "Crash Landing on You",
-                    "Queen of Tears", "Goblin", "Vincenzo", "Crash Course in Romance"
-                )
-
-                val fetchedShows = mutableListOf<Anime>()
-
-                for (query in popularQueries) {
-                    try {
-                        val results = videasy.searchShows(query)
-                        val match = results.firstOrNull()?.show
-                        if (match != null && !isAnimationContent(match)) {
-                            val mapped = mapVideasyShowToAnime(
-                                show = match,
-                                offset = 20000,
-                                fallbackEpisodes = 12,
-                                fallbackStatus = "Running",
-                                fallbackGenre = "Drama",
-                                mediaType = "tv"
-                            )
-                            if (fetchedShows.none { it.malId == mapped.malId }) {
-                                fetchedShows.add(mapped)
-                            }
-
-                            cacheTmdbId(mapped.malId, resolveTmdbId(match, preferMovie = false))
-                            cacheVideasyId(mapped.malId, match.id.toString())
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.w("VideasyAPI", "Show search failed for $query: ${e.message}")
-                    }
+                discoverPage = videasy.getShows(0)
+                
+                val mappedShows = discoverPage.filter { !isAnimationContent(it) }.map { show ->
+                    val mapped = mapVideasyShowToAnime(
+                        show = show,
+                        offset = 20000,
+                        fallbackEpisodes = 12,
+                        fallbackStatus = "Running",
+                        fallbackGenre = "Drama",
+                        mediaType = "tv"
+                    )
+                    cacheVideasyId(mapped.malId, show.id.toString())
+                    mapped
                 }
-
-                try {
-                    val discoverPage = videasy.getShows(0)
-                    for (show in discoverPage) {
-                        if (!isAnimationContent(show)) {
-                            val mapped = mapVideasyShowToAnime(
-                                show = show,
-                                offset = 20000,
-                                fallbackEpisodes = 12,
-                                fallbackStatus = "Running",
-                                fallbackGenre = "Drama",
-                                mediaType = "tv"
-                            )
-                            if (fetchedShows.none { it.malId == mapped.malId }) {
-                                fetchedShows.add(mapped)
-                            }
-
-                            cacheTmdbId(mapped.malId, resolveTmdbId(show, preferMovie = false))
-                            cacheVideasyId(mapped.malId, show.id.toString())
-                        }
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("VideasyAPI", "Error fetching discover list: ${e.message}")
-                }
-
-                fetchedShows.sortByDescending { it.score }
+                fetchedShows.addAll(mappedShows)
+                
+                // Let's populate TV Shows instantly!
                 _tvShowsList.value = fetchedShows.ifEmpty { localTvShows }
             } catch (e: Exception) {
+                android.util.Log.e("VideasyAPI", "Error loading discover page shows: ${e.message}")
                 _tvShowsList.value = localTvShows
             }
 
+            // 2. Fetch popular movies (only 4 fast queries) and merge with fallback local movies
+            val fetchedMovies = mutableListOf<Anime>()
             try {
                 val videasy = RetrofitInstance.videasyApi
-                val movieQueries = listOf(
-                    "Interstellar", "Inception", "The Dark Knight", "Oppenheimer",
-                    "Spirited Away", "Your Name", "Parasite", "Titanic", "Avatar", "Gladiator"
-                )
-
-                val fetchedMovies = mutableListOf<Anime>()
+                val movieQueries = listOf("Interstellar", "Inception", "The Dark Knight", "Oppenheimer")
+                
                 for (query in movieQueries) {
                     try {
                         val results = videasy.searchShows(query)
                         val match = results.firstOrNull()?.show
-                        if (match != null && !isAnimationContent(match)) {
+                        if (match != null) {
                             val mapped = mapVideasyShowToAnime(
                                 show = match,
                                 offset = 10000,
@@ -596,21 +613,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             if (fetchedMovies.none { it.malId == mapped.malId }) {
                                 fetchedMovies.add(mapped)
                             }
-
-                                cacheTmdbId(mapped.malId, resolveTmdbId(match, preferMovie = true))
-                                cacheVideasyId(mapped.malId, match.id.toString())
+                            cacheVideasyId(mapped.malId, match.id.toString())
                         }
                     } catch (e: Exception) {
-                        android.util.Log.w("VideasyAPI", "Movie search failed for $query: ${e.message}")
+                        // Safe ignore
                     }
                 }
-
-                _moviesList.value = fetchedMovies.ifEmpty { localMovies }
+                
+                // Merge with fallback localMovies to guarantee a beautiful rich grid
+                val finalMovies = (fetchedMovies + localMovies).distinctBy { it.malId }
+                _moviesList.value = finalMovies
             } catch (e: Exception) {
                 _moviesList.value = localMovies
             }
 
             updateRecommendations()
+
+            // 3. Resolve TMDB IDs in a non-blocking background task with a small delay so we don't block startup
+            val showsListToResolve = discoverPage
+            if (showsListToResolve.isNotEmpty() || fetchedMovies.isNotEmpty()) {
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    // Resolve TV shows
+                    fetchedShows.take(15).forEach { show ->
+                        delay(250)
+                        try {
+                            val vShowId = show.malId - 20000
+                            val original = showsListToResolve.find { it.id == vShowId }
+                            if (original != null) {
+                                val resolved = resolveTmdbId(original, preferMovie = false)
+                                cacheTmdbId(show.malId, resolved)
+                            }
+                        } catch (e: Exception) {
+                            // Safe ignore
+                        }
+                    }
+
+                    // Resolve movies
+                    fetchedMovies.forEach { show ->
+                        delay(250)
+                        try {
+                            val results = RetrofitInstance.videasyApi.searchShows(show.title)
+                            val match = results.firstOrNull()?.show
+                            if (match != null) {
+                                val resolved = resolveTmdbId(match, preferMovie = true)
+                                cacheTmdbId(show.malId, resolved)
+                            }
+                        } catch (e: Exception) {
+                            // Safe ignore
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -807,6 +860,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         lists.addAll(_moviesList.value)
         lists.addAll(_tvShowsList.value)
+        if (searchQuery.value.isNotBlank() && _searchResults.value.isNotEmpty()) {
+            lists.addAll(_searchResults.value)
+        }
         return lists.distinctBy { it.malId }
     }
 
@@ -824,11 +880,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             lists.addAll(localUpcomingAnime)
             lists.addAll(localSeasonalAnime)
         }
+        if (searchQuery.value.isNotBlank() && _searchResults.value.isNotEmpty()) {
+            lists.addAll(_searchResults.value)
+        }
         return lists.distinctBy { it.malId }
     }
 
     fun searchAnime(query: String) {
-        if (query.isBlank()) {
+        val normalizedQuery = query.trim()
+        searchQuery.value = normalizedQuery
+
+        if (normalizedQuery.isBlank()) {
             _homeState.value = HomeState.Success(
                 trending = currentTrending,
                 popular = currentPopular,
@@ -840,22 +902,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             _homeState.value = HomeState.Loading
-            
+
             val animeResults = mutableListOf<Anime>()
             val showResults = mutableListOf<Anime>()
-            
+
             // 1. Search Anime via Jikan API
             try {
-                val response = api.searchAnime(query = query)
+                val response = api.searchAnime(query = normalizedQuery)
                 animeResults.addAll(response.data.filterSafe())
             } catch (e: Exception) {
                 android.util.Log.e("UniversalSearch", "Anime search failed: ${e.message}")
             }
-            
+
             // 2. Search Shows & Movies via Videasy API
             try {
                 val videasy = RetrofitInstance.videasyApi
-                val results = videasy.searchShows(query)
+                val results = videasy.searchShows(normalizedQuery)
                 results.forEach { result ->
                     val match = result.show
                     if (isAnimationContent(match)) {
@@ -880,29 +942,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 android.util.Log.e("UniversalSearch", "Shows search failed: ${e.message}")
             }
-            
+
             // 3. Local filtering fallback with character names support
             val localResults = (localTrendingAnime + localPopularAnime + localSeasonalAnime + localMovies + localTvShows)
                 .filter { anime ->
-                    val titleMatches = anime.title.contains(query, ignoreCase = true) || 
-                                       anime.titleEnglish?.contains(query, ignoreCase = true) == true
-                    val characterMatches = getAnimeCharacters(anime.malId).any { it.contains(query, ignoreCase = true) }
+                    val titleMatches = anime.title.contains(normalizedQuery, ignoreCase = true) ||
+                        anime.titleEnglish?.contains(normalizedQuery, ignoreCase = true) == true
+                    val characterMatches = getAnimeCharacters(anime.malId).any { it.contains(normalizedQuery, ignoreCase = true) }
                     titleMatches || characterMatches
                 }
                 .filterSafe()
-            
-            // Combine all results
+
             val combinedResults = (animeResults + showResults + localResults)
                 .distinctBy { it.malId }
                 .sortedByDescending { it.score ?: 0.0 }
-                
+
             _searchResults.value = combinedResults
-            
+
             _homeState.value = HomeState.Success(
                 trending = currentTrending,
                 popular = currentPopular,
                 upcoming = currentUpcoming,
-                seasonal = combinedResults
+                seasonal = currentSeasonal
             )
         }
     }
@@ -991,9 +1052,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _detailState.value = DetailState.Loading
             }
             
-            // Only fetch from Jikan API for anime (IDs < 10000)
-            // Movies (10000-19999) and TV shows (20000-29999) are Videasy data
-            if (id < 10000) {
+            // Only fetch from Jikan API for anime (excluding movies/TV shows and custom IDs in 1000..2999)
+            val isMovieOrShow = (cached?.mediaType == "movie" || cached?.mediaType == "tv" || id in 1000..2999)
+            val isAnime = (id < 10000) && !isMovieOrShow
+            if (isAnime) {
                 try {
                     val response = api.getAnimeDetails(id)
                     _detailState.value = DetailState.Success(response.data)
@@ -1016,102 +1078,83 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Authentication ---
+    // Authentication
     fun clearAuthError() {
         _authError.value = null
     }
 
-    fun register(email: String, username: String, pass: String): Boolean {
+    fun register(email: String, username: String, pass: String) {
         if (email.isBlank() || username.isBlank() || pass.isBlank()) {
             _authError.value = "All fields are required"
-            return false
+            return
         }
         val cleanUser = username.trim()
         val cleanEmail = email.trim()
 
         if (cleanUser.length < 3) {
             _authError.value = "Username must be at least 3 characters"
-            return false
+            return
         }
         if (pass.length < 4) {
             _authError.value = "Password must be at least 4 characters"
-            return false
+            return
         }
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(cleanEmail).matches()) {
             _authError.value = "Please enter a valid email address"
-            return false
+            return
         }
 
-        val userListStr = prefs.getString("registered_user_list", "") ?: ""
-        val userList = userListStr.split(",").filter { it.isNotBlank() }.map { it.lowercase() }
-        if (userList.contains(cleanUser.lowercase())) {
-            _authError.value = "Username is already taken!"
-            return false
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = null
+            try {
+                val (success, message) = com.example.data.db.NeonDatabaseHelper.registerUser(cleanEmail, cleanUser, pass)
+                if (success) {
+                    // Success, auto-login
+                    val (user, loginMessage) = com.example.data.db.NeonDatabaseHelper.loginUser(cleanUser, pass)
+                    if (user != null) {
+                        _currentUser.value = user
+                        saveCurrentUserToPrefs(user)
+                        _authError.value = null
+                    } else {
+                        _authError.value = loginMessage
+                    }
+                } else {
+                    _authError.value = message
+                }
+            } catch (e: Throwable) {
+                _authError.value = e.localizedMessage ?: "Network error during registration"
+            } finally {
+                _isAuthLoading.value = false
+            }
         }
-
-        prefs.edit()
-            .putString("user_pass_${cleanUser.lowercase()}", pass)
-            .putString("user_email_${cleanUser.lowercase()}", cleanEmail)
-            .putString("user_avatar_${cleanUser.lowercase()}", "https://api.dicebear.com/7.x/adventurer/svg?seed=$cleanUser")
-            .putString("user_banner_${cleanUser.lowercase()}", "")
-            .putInt("user_level_${cleanUser.lowercase()}", 1)
-            .putInt("user_xp_${cleanUser.lowercase()}", 25)
-            .putInt("user_xpNeeded_${cleanUser.lowercase()}", 100)
-            .putInt("user_watchTime_${cleanUser.lowercase()}", 0)
-            .putString("registered_user_list", if (userListStr.isEmpty()) cleanUser else "$userListStr,$cleanUser")
-            .apply()
-
-        return loginWithPassword(cleanUser, pass)
     }
 
-    fun loginWithPassword(identifier: String, pass: String): Boolean {
+    fun loginWithPassword(identifier: String, pass: String) {
         if (identifier.isBlank() || pass.isBlank()) {
             _authError.value = "All fields are required"
-            return false
+            return
         }
         val cleanId = identifier.trim()
 
-        var matchedUsername: String? = null
-        val userListStr = prefs.getString("registered_user_list", "") ?: ""
-        val userList = userListStr.split(",").filter { it.isNotBlank() }
-
-        val targetUsername = userList.find { it.equals(cleanId, ignoreCase = true) }
-        if (targetUsername != null) {
-            matchedUsername = targetUsername
-        } else {
-            for (u in userList) {
-                val email = prefs.getString("user_email_${u.lowercase()}", "")
-                if (email.equals(cleanId, ignoreCase = true)) {
-                    matchedUsername = u
-                    break
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            _authError.value = null
+            try {
+                val (user, message) = com.example.data.db.NeonDatabaseHelper.loginUser(cleanId, pass)
+                if (user != null) {
+                    _currentUser.value = user
+                    saveCurrentUserToPrefs(user)
+                    _authError.value = null
+                } else {
+                    _authError.value = message
                 }
+            } catch (e: Throwable) {
+                _authError.value = e.localizedMessage ?: "Network error during login"
+            } finally {
+                _isAuthLoading.value = false
             }
         }
-
-        if (matchedUsername == null) {
-            _authError.value = "Account not found. Please sign up first."
-            return false
-        }
-
-        val storedPass = prefs.getString("user_pass_${matchedUsername.lowercase()}", null)
-        if (storedPass != pass) {
-            _authError.value = "Incorrect password. Please try again."
-            return false
-        }
-
-        val email = prefs.getString("user_email_${matchedUsername.lowercase()}", "") ?: ""
-        val avatar = prefs.getString("user_avatar_${matchedUsername.lowercase()}", "https://api.dicebear.com/7.x/adventurer/svg?seed=$matchedUsername") ?: "https://api.dicebear.com/7.x/adventurer/svg?seed=$matchedUsername"
-        val banner = prefs.getString("user_banner_${matchedUsername.lowercase()}", "") ?: ""
-        val level = prefs.getInt("user_level_${matchedUsername.lowercase()}", 1)
-        val xp = prefs.getInt("user_xp_${matchedUsername.lowercase()}", 25)
-        val xpNeeded = prefs.getInt("user_xpNeeded_${matchedUsername.lowercase()}", 100)
-        val watchTime = prefs.getInt("user_watchTime_${matchedUsername.lowercase()}", 0)
-
-        val user = User(matchedUsername, email, avatar, banner, level, xp, xpNeeded, watchTime)
-        _currentUser.value = user
-        saveCurrentUserToPrefs(user)
-        _authError.value = null
-        return true
     }
 
     fun login(email: String, username: String): Boolean {
@@ -1150,6 +1193,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .putString("user_avatar_${user.username.lowercase()}", avatarUrl)
                 .putString("user_banner_${user.username.lowercase()}", bannerUrl)
                 .apply()
+
+            viewModelScope.launch {
+                try {
+                    com.example.data.db.NeonDatabaseHelper.updateProfileInDb(user.username, avatarUrl, bannerUrl)
+                } catch (t: Throwable) {
+                    android.util.Log.e("MainViewModel", "Failed to update profile in DB safely: ${t.message}", t)
+                }
+            }
         }
     }
 
@@ -1206,7 +1257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Favorites ---
+    // Favorites
     fun toggleFavorite(anime: Anime) {
         val currentList = _favorites.value.toMutableList()
         val existing = currentList.find { it.malId == anime.malId }
@@ -1223,7 +1274,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return _favorites.value.any { it.malId == animeId }
     }
 
-    // --- Continue Watching & XP Progress ---
+    // Continue Watching & XP Progress
     fun watchEpisode(anime: Anime, episodeNum: Int) {
         // 1. Update list
         val currentList = _continueWatching.value.toMutableList()
@@ -1255,7 +1306,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Reminders ---
+    // Reminders
     fun toggleReminder(airingId: Int) {
         val current = _reminders.value.toMutableSet()
         if (current.contains(airingId)) {
