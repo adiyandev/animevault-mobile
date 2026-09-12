@@ -15,15 +15,15 @@ import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
     primary = Brand,
-    onPrimary = TextPrimary,
-    primaryContainer = BrandDark,
+    onPrimary = Color(0xFF120008),
+    primaryContainer = Color(0xFF55102F),
     onPrimaryContainer = TextPrimary,
     secondary = BrandBright,
-    onSecondary = TextPrimary,
-    secondaryContainer = BrandDark,
+    onSecondary = Color(0xFF16000A),
+    secondaryContainer = Color(0xFF401027),
     onSecondaryContainer = TextPrimary,
-    tertiary = BrandBright,
-    onTertiary = TextPrimary,
+    tertiary = Color(0xFFFF8EBC),
+    onTertiary = Color(0xFF19000B),
     background = Background,
     onBackground = TextPrimary,
     surface = Surface,
@@ -33,14 +33,16 @@ private val DarkColorScheme = darkColorScheme(
     outline = BorderStrong,
     outlineVariant = Border,
     scrim = Scrim,
+    error = Color(0xFFFF6B81),
+    onError = Color(0xFF220008),
 )
 
 private val AnimeVaultShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(26.dp),
 )
 
 @Composable
@@ -55,7 +57,7 @@ fun MyApplicationTheme(
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         window.statusBarColor = Background.toArgb()
-        window.navigationBarColor = Color(0xFF050507).toArgb()
+        window.navigationBarColor = Background.toArgb()
         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
     }
